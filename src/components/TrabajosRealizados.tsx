@@ -1,4 +1,4 @@
-import type { Trabajo, SAF, DocumentacionCamara } from '../types/reporte.types'; 
+import type { Trabajo, SAF } from '../types/reporte.types'; 
 import TrabajoCard from './TrabajoCard';
 
 interface Props {

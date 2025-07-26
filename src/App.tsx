@@ -3,6 +3,7 @@ import type { FormEvent, ChangeEvent } from 'react'
 import type { FormData, Trabajo } from './types/reporte.types'; 
 import ReporteForm from './components/ReporteForm';
 import TrabajosRealizados from './components/TrabajosRealizados';
+import { generarReportePdf } from './utils/generarReportePdf';
 
 export default function App() {
   const [formData, setFormData] = useState<FormData>({
@@ -30,10 +31,11 @@ export default function App() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    console.log('Datos enviados:', { ...formData, trabajos });
+    await generarReportePdf(formData, trabajos);
   };
+
 
   return (
     <div className="min-h-screen bg-gray-100 p-4">

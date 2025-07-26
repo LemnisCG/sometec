@@ -6,6 +6,7 @@ import type { FormEvent, ChangeEvent } from 'react'
 import type { FormData, Trabajo } from './types/reporte.types'; 
 import ReporteForm from './components/ReporteForm';
 import TrabajosRealizados from './components/TrabajosRealizados';
+import { generarReportePdf } from './utils/generarReportePdf';
 
 export default function App() {
   const [formData, setFormData] = useState<FormData>({
@@ -23,7 +24,7 @@ export default function App() {
   });
 
   const [trabajos, setTrabajos] = useState<Trabajo[]>([
-    { estacion: '', saf: [{ titulo: '', detalle: '' }], observaciones: '', documentacionCamara: [{fotoUrl: '', descripcionUrl: ''}] },
+    { estacion: '', saf: [{ titulo: '', detalle: '' }], observaciones: '', documentacionCamara: [] },
   ]);
 
   const handleFormChange = (
@@ -33,10 +34,11 @@ export default function App() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    console.log('Datos enviados:', { ...formData, trabajos });
+    await generarReportePdf(formData, trabajos);
   };
+
 
   return (
     <div className="min-h-screen bg-gray-100 p-4">
@@ -76,22 +78,21 @@ export default function App() {
 
 === components\CameraCapture.tsx ===
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { DocumentacionCamara } from '../types/reporte.types';
 
 interface Props {
-  onCapture: (dataUrl: string) => void;
+  onCapture: (doc: DocumentacionCamara) => void; // devuelve foto+descripción
   onClose: () => void;
-  onText: (descriptionUrl: string) => void;
 }
-export default function CameraCapture({ onCapture, onClose, onText }: Props) {
-  console.log('hola')
+
+export default function CameraCapture({ onCapture, onClose }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  // Solicita la cámara apenas se monta el componente
-  console.log('Se reinicia cada ves que hay un cambio en onText')
+  const [descripcion, setDescripcion] = useState('');
+
   useEffect(() => {
     (async () => {
-      console.log('se reinicio')
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: 'environment' },
@@ -108,14 +109,10 @@ export default function CameraCapture({ onCapture, onClose, onText }: Props) {
         onClose();
       }
     })();
-
-    // Limpieza
-    return () => {
-      streamRef.current?.getTracks().forEach(t => t.stop());
-    };
+    return () => streamRef.current?.getTracks().forEach(t => t.stop());
   }, [onClose]);
 
-  const handleCapture = () => {
+  const manejarCaptura = () => {
     if (!videoRef.current) return;
     const canvas = document.createElement('canvas');
     canvas.width = videoRef.current.videoWidth;
@@ -124,12 +121,13 @@ export default function CameraCapture({ onCapture, onClose, onText }: Props) {
     if (!ctx) return;
     ctx.drawImage(videoRef.current, 0, 0);
     const dataUrl = canvas.toDataURL('image/png');
-    onCapture(dataUrl);
+
+    onCapture({ fotoUrl: dataUrl, descripcion });
     onClose();
   };
 
   return (
-    <div className="mt-2 relative w-full max-w-xs">
+    <div className="mt-2 relative w-full max-w-xs space-y-2">
       <video
         ref={videoRef}
         className="w-full rounded-lg border"
@@ -137,20 +135,20 @@ export default function CameraCapture({ onCapture, onClose, onText }: Props) {
         playsInline
         muted
       />
+      <input
+        type="text"
+        placeholder="Descripción de la imagen"
+        value={descripcion}
+        onChange={e => setDescripcion(e.target.value)}
+        className="w-full p-2 border rounded-lg"
+      />
       <button
         type="button"
-        onClick={handleCapture}
-        className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-white border px-4 py-1 text-sm rounded-full shadow"
+        onClick={manejarCaptura}
+        className="w-full bg-white border px-4 py-1 text-sm rounded-lg shadow"
       >
         📸 Capturar
       </button>
-      <label htmlFor="descriptionUrl">Descripcion de la imagen</label>
-      <input 
-        id='descriptionUrl' 
-        type="text" 
-        onChange={(e) => onText(e.target.value)}
-      
-      />
     </div>
   );
 }
@@ -246,8 +244,8 @@ import CameraCapture from './CameraCapture';
 
 interface Props {
   trabajo: Trabajo;
-  onTrabajoChange: (field: keyof Trabajo, value: string) => void;
-  onSafChange: (safIdx: number, field: keyof SAF, value: string) => void;
+  onTrabajoChange: <K extends keyof Trabajo>(campo: K, valor: Trabajo[K]) => void;
+  onSafChange: (safIdx: number, campo: keyof SAF, valor: string) => void;
   addSaf: () => void;
 }
 
@@ -256,9 +254,14 @@ export default function TrabajoCard({
   onTrabajoChange,
   onSafChange,
   addSaf,
-
 }: Props) {
   const [cameraOpen, setCameraOpen] = useState(false);
+
+  /* añade una nueva foto */
+  const agregarDoc = (doc: DocumentacionCamara) => {
+    const nuevasFotos = [...trabajo.documentacionCamara, doc];
+    onTrabajoChange('documentacionCamara', nuevasFotos);
+  };
 
   return (
     <div className="border p-4 rounded-lg space-y-4 bg-gray-50">
@@ -277,15 +280,14 @@ export default function TrabajoCard({
         <SAFEntry
           key={idx}
           saf={saf}
-          onFieldChange={(field, value) => onSafChange(idx, field, value)}
+          onFieldChange={(campo, valor) => onSafChange(idx, campo, valor)}
         />
       ))}
-
       <button type="button" onClick={addSaf} className="text-sm text-blue-600">
         + Agregar SAF
       </button>
 
-      {/* Observaciones + Foto */}
+      {/* Observaciones */}
       <div className="space-y-2">
         <label className="font-semibold">Observaciones</label>
         <textarea
@@ -293,36 +295,36 @@ export default function TrabajoCard({
           onChange={e => onTrabajoChange('observaciones', e.target.value)}
           className="w-full p-2 border border-gray-300 rounded-lg"
         />
+      </div>
 
+      {/* Fotos */}
+      <div className="space-y-2">
         {cameraOpen ? (
           <CameraCapture
-            onCapture={dataUrl => onTrabajoChange('documentacionCamara', dataUrl)}
+            onCapture={agregarDoc}
             onClose={() => setCameraOpen(false)}
-            onText={descriptionUrl => onTrabajoChange('documentacionCamara', descriptionUrl)}
           />
         ) : (
           <button
             type="button"
             onClick={() => setCameraOpen(true)}
-            className="mt-2 text-sm text-blue-600 underline"
+            className="text-sm text-blue-600 underline"
           >
             📷 Tomar Foto
           </button>
         )}
 
-        {trabajo.documentacionCamara?[0].fotoUrl && (
-          <div>
-            <img 
-              src={trabajo.fotoUrl}
-              alt="Foto observación"
-              className="mt-2 rounded-lg border max-w-xs"
+        {/* miniaturas */}
+        {trabajo.documentacionCamara?.map((doc, i) => (
+          <div key={i} className="flex items-start gap-2">
+            <img
+              src={doc.fotoUrl}
+              alt={`Foto ${i + 1}`}
+              className="w-24 h-24 object-cover rounded-lg border"
             />
-            {trabajo.descriptionUrl && (
-              <p>{trabajo.descriptionUrl}</p>
-            )}
+            <p className="flex-1">{doc.descripcion}</p>
           </div>
-
-        )}
+        ))}
       </div>
     </div>
   );
@@ -334,7 +336,7 @@ export default function TrabajoCard({
 
 === components\TrabajosRealizados.tsx ===
 
-import type { Trabajo, SAF } from '../types/reporte.types'; 
+import type { Trabajo, SAF, DocumentacionCamara } from '../types/reporte.types'; 
 import TrabajoCard from './TrabajoCard';
 
 interface Props {
@@ -345,11 +347,15 @@ interface Props {
 export default function TrabajosRealizados({ trabajos, setTrabajos }: Props) {
   /* Helpers para mutar estado inmutablemente */
   const handleTrabajoChange =
-    (idx: number) => (field: keyof Trabajo, value: string) => {
+    (idx: number) =>
+    <K extends keyof Trabajo>(campo: K, valor: Trabajo[K]) => {
       setTrabajos(
-        trabajos.map((t, i) => (i === idx ? { ...t, [field]: value } : t))
+        trabajos.map((t, i) =>
+          i === idx ? { ...t, [campo]: valor } : t,
+        ),
       );
     };
+
 
   const handleSafChange =
     (trabajoIdx: number) =>
@@ -379,7 +385,7 @@ export default function TrabajosRealizados({ trabajos, setTrabajos }: Props) {
   const addTrabajo = () => {
     setTrabajos([
       ...trabajos,
-      { estacion: '', saf: [{ titulo: '', detalle: '' }], observaciones: '' },
+      { estacion: '', saf: [{ titulo: '', detalle: '' }], observaciones: '', documentacionCamara: [] },
     ]);
   };
 
@@ -461,16 +467,137 @@ export interface SAF  {
   detalle: string;
 };
 export interface DocumentacionCamara {
-  fotoUrl?: string;
-  descripcionUrl?: string;
+  fotoUrl: string;
+  descripcion: string;
 }
 
 export interface Trabajo {
   estacion: string;
   saf: SAF[];
   observaciones: string;
-  documentacionCamara?: DocumentacionCamara[];
+  documentacionCamara: DocumentacionCamara[];
 };
+
+
+------------------------------------
+
+
+=== utils\generarReportePdf.ts ===
+
+// src/utils/generarReportePdf.ts
+import { jsPDF } from 'jspdf';
+import type { FormData, Trabajo } from '../types/reporte.types';
+
+/**
+ * Genera y descarga un PDF con el contenido del formulario y los trabajos.
+ */
+export async function generarReportePdf(
+  datos: FormData,
+  trabajos: Trabajo[],
+) {
+  const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+  const margen = 15;
+  let y = margen;
+
+  // ---------- Encabezado ----------
+  doc.setFontSize(16).setFont('helvetica', 'bold');
+  doc.text('Reporte Diario – Sometec', 105, y, { align: 'center' });
+  y += 10;
+
+  // ---------- Datos generales ----------
+  doc.setFontSize(11).setFont('helvetica', 'normal');
+
+  const campos: (keyof FormData)[] = [
+    'fecha', 'contrato', 'zonaTrabajo', 'supervisor', 'prevencionista',
+    'vehiculos', 'personal', 'itoMetro', 'acuerdos',
+    'horaIngreso', 'horaSalida',
+  ];
+
+  campos.forEach((c) => {
+    doc.text(`${formatearEtiqueta(c)}: ${datos[c]}`, margen, y);
+    y = saltarLinea(doc, y);
+  });
+
+  // ---------- Trabajos ----------
+  trabajos.forEach((trabajo, i) => {
+    y = insertarSubtitulo(doc, `Estación ${i + 1}: ${trabajo.estacion}`, y);
+
+    // SAF
+    trabajo.saf.forEach((saf, j) => {
+      doc.text(`SAF ${j + 1} – ${saf.titulo}`, margen, y);
+      y = saltarLinea(doc, y);
+      y = insertarParrafo(doc, saf.detalle, margen + 5, y);
+    });
+
+    // Observaciones
+    if (trabajo.observaciones) {
+      y = insertarParrafo(
+        doc,
+        `Observaciones: ${trabajo.observaciones}`,
+        margen,
+        y,
+      );
+    }
+
+    // Fotos
+    for (const { fotoUrl, descripcion } of trabajo.documentacionCamara) {
+      const { width, height } = escalarImagen(80, 60); // máximo 80 mm × 60 mm
+      if (y + height > 285) doc.addPage(), (y = margen);
+      doc.addImage(fotoUrl, 'PNG', margen, y, width, height);
+      if (descripcion) {
+        doc.text(descripcion, margen + width + 5, y + 5);
+      }
+      y = saltarLinea(doc, y, height);
+    }
+
+    y = saltarLinea(doc, y, 5); // espacio entre estaciones
+  });
+
+  // ---------- Guardar ----------
+  doc.save(`reporte_${datos.fecha || Date.now()}.pdf`);
+}
+
+/* ----------------- Helpers ----------------- */
+
+/** Devuelve etiqueta legible a partir de la clave del objeto */
+function formatearEtiqueta(k: string) {
+  return k.replace(/([A-Z])/g, ' $1').replace(/^./, (l) => l.toUpperCase());
+}
+
+/** Añade salto de línea; si llegamos al final, crea nueva página */
+function saltarLinea(doc: jsPDF, yActual: number, salto = 7) {
+  const y = yActual + salto;
+  if (y > 285) {
+    doc.addPage();
+    return 15; // margen superior
+  }
+  return y;
+}
+
+/** Inserta subtítulo y devuelve el nuevo Y */
+function insertarSubtitulo(doc: jsPDF, texto: string, y: number) {
+  doc.setFontSize(13).setFont('helvetica', 'bold');
+  doc.text(texto, 15, y);
+  doc.setFontSize(11).setFont('helvetica', 'normal');
+  return y + 7;
+}
+
+/** Inserta párrafo con envoltura automática */
+function insertarParrafo(doc: jsPDF, texto: string, x: number, y: number) {
+  const lineas = doc.splitTextToSize(texto, 180 - x);
+  lineas.forEach((l: any) => {
+    doc.text(l, x, y);
+    y = saltarLinea(doc, y);
+  });
+  return y;
+}
+
+/** Devuelve ancho y alto manteniendo proporción dentro de los máximos dados */
+function escalarImagen(maxW: number, maxH: number) {
+  // asume 4:3; ajusta según tu contexto si lo necesitas
+  const ratio = maxW / maxH;
+  return { width: maxW, height: maxW / ratio };
+}
 
 
 ------------------------------------
