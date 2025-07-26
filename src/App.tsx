@@ -20,7 +20,7 @@ export default function App() {
   });
 
   const [trabajos, setTrabajos] = useState<Trabajo[]>([
-    { estacion: '', saf: [{ titulo: '', detalle: '' }], observaciones: '' },
+    { estacion: '', saf: [{ titulo: '', detalle: '' }], observaciones: '', documentacionCamara: [] },
   ]);
 
   const handleFormChange = (

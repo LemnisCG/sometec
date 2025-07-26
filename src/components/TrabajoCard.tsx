@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import type { Trabajo, SAF } from '../types/reporte.types';
+import type { Trabajo, SAF, DocumentacionCamara } from '../types/reporte.types';
 import SAFEntry from './SAFEntry';
 import CameraCapture from './CameraCapture';
 
 interface Props {
   trabajo: Trabajo;
-  onTrabajoChange: (field: keyof Trabajo, value: string) => void;
-  onSafChange: (safIdx: number, field: keyof SAF, value: string) => void;
+  onTrabajoChange: <K extends keyof Trabajo>(campo: K, valor: Trabajo[K]) => void;
+  onSafChange: (safIdx: number, campo: keyof SAF, valor: string) => void;
   addSaf: () => void;
 }
 
@@ -17,6 +17,12 @@ export default function TrabajoCard({
   addSaf,
 }: Props) {
   const [cameraOpen, setCameraOpen] = useState(false);
+
+  /* añade una nueva foto */
+  const agregarDoc = (doc: DocumentacionCamara) => {
+    const nuevasFotos = [...trabajo.documentacionCamara, doc];
+    onTrabajoChange('documentacionCamara', nuevasFotos);
+  };
 
   return (
     <div className="border p-4 rounded-lg space-y-4 bg-gray-50">
@@ -35,15 +41,14 @@ export default function TrabajoCard({
         <SAFEntry
           key={idx}
           saf={saf}
-          onFieldChange={(field, value) => onSafChange(idx, field, value)}
+          onFieldChange={(campo, valor) => onSafChange(idx, campo, valor)}
         />
       ))}
-
       <button type="button" onClick={addSaf} className="text-sm text-blue-600">
         + Agregar SAF
       </button>
 
-      {/* Observaciones + Foto */}
+      {/* Observaciones */}
       <div className="space-y-2">
         <label className="font-semibold">Observaciones</label>
         <textarea
@@ -51,29 +56,36 @@ export default function TrabajoCard({
           onChange={e => onTrabajoChange('observaciones', e.target.value)}
           className="w-full p-2 border border-gray-300 rounded-lg"
         />
+      </div>
 
+      {/* Fotos */}
+      <div className="space-y-2">
         {cameraOpen ? (
           <CameraCapture
-            onCapture={dataUrl => onTrabajoChange('fotoUrl', dataUrl)}
+            onCapture={agregarDoc}
             onClose={() => setCameraOpen(false)}
           />
         ) : (
           <button
             type="button"
             onClick={() => setCameraOpen(true)}
-            className="mt-2 text-sm text-blue-600 underline"
+            className="text-sm text-blue-600 underline"
           >
             📷 Tomar Foto
           </button>
         )}
 
-        {trabajo.fotoUrl && (
-          <img
-            src={trabajo.fotoUrl}
-            alt="Foto observación"
-            className="mt-2 rounded-lg border max-w-xs"
-          />
-        )}
+        {/* miniaturas */}
+        {trabajo.documentacionCamara?.map((doc, i) => (
+          <div key={i} className="flex items-start gap-2">
+            <img
+              src={doc.fotoUrl}
+              alt={`Foto ${i + 1}`}
+              className="w-24 h-24 object-cover rounded-lg border"
+            />
+            <p className="flex-1">{doc.descripcion}</p>
+          </div>
+        ))}
       </div>
     </div>
   );

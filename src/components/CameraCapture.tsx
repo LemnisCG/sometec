@@ -1,15 +1,16 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { DocumentacionCamara } from '../types/reporte.types';
 
 interface Props {
-  onCapture: (dataUrl: string) => void;
+  onCapture: (doc: DocumentacionCamara) => void; // devuelve foto+descripción
   onClose: () => void;
 }
 
 export default function CameraCapture({ onCapture, onClose }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const [descripcion, setDescripcion] = useState('');
 
-  // Solicita la cámara apenas se monta el componente
   useEffect(() => {
     (async () => {
       try {
@@ -28,14 +29,10 @@ export default function CameraCapture({ onCapture, onClose }: Props) {
         onClose();
       }
     })();
-
-    // Limpieza
-    return () => {
-      streamRef.current?.getTracks().forEach(t => t.stop());
-    };
+    return () => streamRef.current?.getTracks().forEach(t => t.stop());
   }, [onClose]);
 
-  const handleCapture = () => {
+  const manejarCaptura = () => {
     if (!videoRef.current) return;
     const canvas = document.createElement('canvas');
     canvas.width = videoRef.current.videoWidth;
@@ -44,12 +41,13 @@ export default function CameraCapture({ onCapture, onClose }: Props) {
     if (!ctx) return;
     ctx.drawImage(videoRef.current, 0, 0);
     const dataUrl = canvas.toDataURL('image/png');
-    onCapture(dataUrl);
+
+    onCapture({ fotoUrl: dataUrl, descripcion });
     onClose();
   };
 
   return (
-    <div className="mt-2 relative w-full max-w-xs">
+    <div className="mt-2 relative w-full max-w-xs space-y-2">
       <video
         ref={videoRef}
         className="w-full rounded-lg border"
@@ -57,10 +55,17 @@ export default function CameraCapture({ onCapture, onClose }: Props) {
         playsInline
         muted
       />
+      <input
+        type="text"
+        placeholder="Descripción de la imagen"
+        value={descripcion}
+        onChange={e => setDescripcion(e.target.value)}
+        className="w-full p-2 border rounded-lg"
+      />
       <button
         type="button"
-        onClick={handleCapture}
-        className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-white border px-4 py-1 text-sm rounded-full shadow"
+        onClick={manejarCaptura}
+        className="w-full bg-white border px-4 py-1 text-sm rounded-lg shadow"
       >
         📸 Capturar
       </button>

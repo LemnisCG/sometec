@@ -16,10 +16,14 @@ export interface SAF  {
   titulo: string;
   detalle: string;
 };
+export interface DocumentacionCamara {
+  fotoUrl: string;
+  descripcion: string;
+}
 
 export interface Trabajo {
   estacion: string;
   saf: SAF[];
   observaciones: string;
-  fotoUrl?: string;
+  documentacionCamara: DocumentacionCamara[];
 };

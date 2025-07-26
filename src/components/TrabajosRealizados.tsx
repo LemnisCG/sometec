@@ -1,4 +1,4 @@
-import type { Trabajo, SAF } from '../types/reporte.types'; 
+import type { Trabajo, SAF, DocumentacionCamara } from '../types/reporte.types'; 
 import TrabajoCard from './TrabajoCard';
 
 interface Props {
@@ -9,11 +9,15 @@ interface Props {
 export default function TrabajosRealizados({ trabajos, setTrabajos }: Props) {
   /* Helpers para mutar estado inmutablemente */
   const handleTrabajoChange =
-    (idx: number) => (field: keyof Trabajo, value: string) => {
+    (idx: number) =>
+    <K extends keyof Trabajo>(campo: K, valor: Trabajo[K]) => {
       setTrabajos(
-        trabajos.map((t, i) => (i === idx ? { ...t, [field]: value } : t))
+        trabajos.map((t, i) =>
+          i === idx ? { ...t, [campo]: valor } : t,
+        ),
       );
     };
+
 
   const handleSafChange =
     (trabajoIdx: number) =>
@@ -43,7 +47,7 @@ export default function TrabajosRealizados({ trabajos, setTrabajos }: Props) {
   const addTrabajo = () => {
     setTrabajos([
       ...trabajos,
-      { estacion: '', saf: [{ titulo: '', detalle: '' }], observaciones: '' },
+      { estacion: '', saf: [{ titulo: '', detalle: '' }], observaciones: '', documentacionCamara: [] },
     ]);
   };
 
