@@ -60,6 +60,18 @@ export default function TrabajoCard({
 
       {/* Fotos */}
       <div className="space-y-2">
+
+        {/* miniaturas */}
+        {trabajo.documentacionCamara?.map((doc, i) => (
+          <div key={i} className="flex items-start gap-2">
+            <img
+              src={doc.fotoUrl}
+              alt={`Foto ${i + 1}`}
+              className="w-24 h-24 object-cover rounded-lg border"
+              />
+            <p className="flex-1">{doc.descripcion}</p>
+          </div>
+        ))}
         {cameraOpen ? (
           <CameraCapture
             onCapture={agregarDoc}
@@ -74,18 +86,6 @@ export default function TrabajoCard({
             📷 Tomar Foto
           </button>
         )}
-
-        {/* miniaturas */}
-        {trabajo.documentacionCamara?.map((doc, i) => (
-          <div key={i} className="flex items-start gap-2">
-            <img
-              src={doc.fotoUrl}
-              alt={`Foto ${i + 1}`}
-              className="w-24 h-24 object-cover rounded-lg border"
-            />
-            <p className="flex-1">{doc.descripcion}</p>
-          </div>
-        ))}
       </div>
     </div>
   );
