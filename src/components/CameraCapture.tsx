@@ -55,8 +55,7 @@ export default function CameraCapture({ onCapture, onClose }: Props) {
         playsInline
         muted
       />
-      <input
-        type="text"
+      <textarea
         placeholder="Descripción de la imagen"
         value={descripcion}
         onChange={e => setDescripcion(e.target.value)}
